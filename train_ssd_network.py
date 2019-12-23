@@ -12,7 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Generic training script that trains a SSD model using a given dataset."""
+"""Generic training script that trains a SSD model using a given dataset.
+Usage:
+python train_ssd_network.py \
+--train_dir=/path/to/folder \
+--dataset_dir=/path/to/folder/ \
+--dataset_name=pascalvoc_2007 \
+--dataset_split_name=train \
+--model_name=ssd_300_vgg \
+--checkpoint_path=/path/to/model.ckpt \
+--checkpoint_exclude_scopes=ssd_300_vgg/conv6,ssd_300_vgg/conv7,ssd_300_vgg/block8,ssd_300_vgg/block9,ssd_300_vgg/block10,ssd_300_vgg/block11,ssd_300_vgg/block4_box,ssd_300_vgg/block7_box,ssd_300_vgg/block8_box,ssd_300_vgg/block9_box,ssd_300_vgg/block10_box,ssd_300_vgg/block11_box \
+--trainable_scopes=ssd_300_vgg/conv6,ssd_300_vgg/conv7,ssd_300_vgg/block8,ssd_300_vgg/block9,ssd_300_vgg/block10,ssd_300_vgg/block11,ssd_300_vgg/block4_box,ssd_300_vgg/block7_box,ssd_300_vgg/block8_box,ssd_300_vgg/block9_box,ssd_300_vgg/block10_box,ssd_300_vgg/block11_box \
+--num_classes=2 \
+--split_to_sizes=3600 \
+--save_summaries_secs=60 \
+--save_interval_secs=600 \
+--gpu_memory_fraction=0.8 \
+--weight_decay=0.0005 \
+--optimizer=adam \
+--learning_rate=0.001 \
+--learning_rate_decay_factor=0.95 \
+--batch_size=32 \
+--ignore_missing_vars = True
+
+
+NOTE that
+--dataset_name: please chose one from the following arguments {cifar10, imagenet, pascalvoc_2007, pascalvoc_2012}
+--dataset_split_name: if you train voc format dataset, please input train/test as the tfrecord names
+--num_classes: number of background plus custom dataset categories
+--split_to_sizes: the total number of images in your dataset
+--checkpoint_path: provide the original ssd model.ckpt path or your custom fine-tuned model path.
+"""
 import tensorflow as tf
 from tensorflow.python.ops import control_flow_ops
 
@@ -133,6 +163,8 @@ tf.app.flags.DEFINE_string(
     'dataset_name', 'imagenet', 'The name of the dataset to load.')
 tf.app.flags.DEFINE_integer(
     'num_classes', 21, 'Number of classes to use in the dataset.')
+tf.app.flags.DEFINE_integer(
+    'split_to_sizes', 4952, 'Number of total images in dataset.')
 tf.app.flags.DEFINE_string(
     'dataset_split_name', 'train', 'The name of the train/test split.')
 tf.app.flags.DEFINE_string(
@@ -201,7 +233,7 @@ def main(_):
 
         # Select the dataset.
         dataset = dataset_factory.get_dataset(
-            FLAGS.dataset_name, FLAGS.dataset_split_name, FLAGS.dataset_dir)
+            FLAGS.dataset_name, FLAGS.dataset_split_name, FLAGS.dataset_dir,split_to_sizes=FLAGS.split_to_sizes,num_classes=FLAGS.num_classes)
 
         # Get the SSD network and its anchors.
         ssd_class = nets_factory.get_network(FLAGS.model_name)

@@ -93,8 +93,8 @@ class SSDNet(object):
     """
     default_params = SSDParams(
         img_shape=(300, 300),
-        num_classes=21,
-        no_annotation_label=21,
+        num_classes=2,
+        no_annotation_label=2,
         feat_layers=['block4', 'block7', 'block8', 'block9', 'block10', 'block11'],
         feat_shapes=[(38, 38), (19, 19), (10, 10), (5, 5), (3, 3), (1, 1)],
         anchor_size_bounds=[0.15, 0.90],
@@ -129,6 +129,7 @@ class SSDNet(object):
         """
         if isinstance(params, SSDParams):
             self.params = params
+            print('\n\n\n\n hhhhhhhh')
         else:
             self.params = SSDNet.default_params
 
@@ -470,7 +471,7 @@ def ssd_net(inputs,
         net = slim.max_pool2d(net, [3, 3], stride=1, scope='pool5')
 
         # Additional SSD blocks.
-        # Block 6: let's dilate the hell out of it!
+        # Block 6: let's dilate the hell out of it!1
         net = slim.conv2d(net, 1024, [3, 3], rate=6, scope='conv6')
         end_points['block6'] = net
         net = tf.layers.dropout(net, rate=dropout_keep_prob, training=is_training)

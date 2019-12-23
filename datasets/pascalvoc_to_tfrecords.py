@@ -55,8 +55,8 @@ import tensorflow as tf
 
 import xml.etree.ElementTree as ET
 
-from datasets.dataset_utils import int64_feature, float_feature, bytes_feature
-from datasets.pascalvoc_common import VOC_LABELS
+from datasets.dataset_utils import int64_feature, float_feature, bytes_feature, write_label_file
+# from datasets.pascalvoc_common import VOC_LABELS
 
 # Original dataset organisation.
 DIRECTORY_ANNOTATIONS = 'Annotations/'
@@ -64,7 +64,7 @@ DIRECTORY_IMAGES = 'JPEGImages/'
 
 # TFRecords convertion parameters.
 RANDOM_SEED = 4242
-SAMPLES_PER_FILES = 200
+
 
 
 def _process_image(directory, name):
@@ -80,7 +80,7 @@ def _process_image(directory, name):
     """
     # Read the image file.
     filename = directory + DIRECTORY_IMAGES + name + '.jpg'
-    image_data = tf.gfile.FastGFile(filename, 'r').read()
+    image_data = tf.gfile.FastGFile(filename, 'rb').read()
 
     # Read the XML annotation file.
     filename = os.path.join(directory, DIRECTORY_ANNOTATIONS, name + '.xml')
@@ -100,7 +100,8 @@ def _process_image(directory, name):
     truncated = []
     for obj in root.findall('object'):
         label = obj.find('name').text
-        labels.append(int(VOC_LABELS[label][0]))
+        labels.append(1)
+        # labels.append(int(VOC_LABELS[label][0]))
         labels_text.append(label.encode('ascii'))
 
         if obj.find('difficult'):
@@ -184,13 +185,15 @@ def _get_output_filename(output_dir, name, idx):
     return '%s/%s_%03d.tfrecord' % (output_dir, name, idx)
 
 
-def run(dataset_dir, output_dir, name='voc_train', shuffling=False):
+def run(dataset_dir, output_dir, name='voc_2007_train', samples_per_files=200, shuffling=False,class_names=None):
     """Runs the conversion operation.
 
     Args:
       dataset_dir: The dataset directory where the dataset is stored.
       output_dir: Output directory.
     """
+    SAMPLES_PER_FILES = samples_per_files
+
     if not tf.gfile.Exists(dataset_dir):
         tf.gfile.MakeDirs(dataset_dir)
 
@@ -219,8 +222,8 @@ def run(dataset_dir, output_dir, name='voc_train', shuffling=False):
                 i += 1
                 j += 1
             fidx += 1
-
+    if class_names:
     # Finally, write the labels file:
-    # labels_to_class_names = dict(zip(range(len(_CLASS_NAMES)), _CLASS_NAMES))
-    # dataset_utils.write_label_file(labels_to_class_names, dataset_dir)
+        labels_to_class_names = dict(zip(range(len(class_names)), class_names))
+        write_label_file(labels_to_class_names, output_dir)
     print('\nFinished converting the Pascal VOC dataset!')

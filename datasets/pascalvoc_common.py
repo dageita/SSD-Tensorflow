@@ -21,29 +21,34 @@ from datasets import dataset_utils
 
 slim = tf.contrib.slim
 
-VOC_LABELS = {
-    'none': (0, 'Background'),
-    'aeroplane': (1, 'Vehicle'),
-    'bicycle': (2, 'Vehicle'),
-    'bird': (3, 'Animal'),
-    'boat': (4, 'Vehicle'),
-    'bottle': (5, 'Indoor'),
-    'bus': (6, 'Vehicle'),
-    'car': (7, 'Vehicle'),
-    'cat': (8, 'Animal'),
-    'chair': (9, 'Indoor'),
-    'cow': (10, 'Animal'),
-    'diningtable': (11, 'Indoor'),
-    'dog': (12, 'Animal'),
-    'horse': (13, 'Animal'),
-    'motorbike': (14, 'Vehicle'),
-    'person': (15, 'Person'),
-    'pottedplant': (16, 'Indoor'),
-    'sheep': (17, 'Animal'),
-    'sofa': (18, 'Indoor'),
-    'train': (19, 'Vehicle'),
-    'tvmonitor': (20, 'Indoor'),
-}
+# VOC_LABELS = {
+#     'none': (0, 'Background'),
+#     'aeroplane': (1, 'Vehicle'),
+#     'bicycle': (2, 'Vehicle'),
+#     'bird': (3, 'Animal'),
+#     'boat': (4, 'Vehicle'),
+#     'bottle': (5, 'Indoor'),
+#     'bus': (6, 'Vehicle'),
+#     'car': (7, 'Vehicle'),
+#     'cat': (8, 'Animal'),
+#     'chair': (9, 'Indoor'),
+#     'cow': (10, 'Animal'),
+#     'diningtable': (11, 'Indoor'),
+#     'dog': (12, 'Animal'),
+#     'horse': (13, 'Animal'),
+#     'motorbike': (14, 'Vehicle'),
+#     'person': (15, 'Person'),
+#     'pottedplant': (16, 'Indoor'),
+#     'sheep': (17, 'Animal'),
+#     'sofa': (18, 'Indoor'),
+#     'train': (19, 'Vehicle'),
+#     'tvmonitor': (20, 'Indoor'),
+# }
+
+# VOC_LABELS = {
+#     'none': (0, 'Background'),
+#     'barcode': (1, 'barcode'),
+# }
 
 
 def get_split(split_name, dataset_dir, file_pattern, reader,
@@ -64,8 +69,10 @@ def get_split(split_name, dataset_dir, file_pattern, reader,
     Raises:
         ValueError: if `split_name` is not a valid train/test split.
     """
-    if split_name not in split_to_sizes:
-        raise ValueError('split name %s was not recognized.' % split_name)
+    # if split_name not in split_to_sizes:
+    #     raise ValueError('split name %s was not recognized.' % split_name)
+    if not split_to_sizes:
+        raise ValueError('please input a valid number of your dataset total images')
     file_pattern = os.path.join(dataset_dir, file_pattern % split_name)
 
     # Allowing None in the signature so that dataset_factory can use the default.
@@ -105,12 +112,11 @@ def get_split(split_name, dataset_dir, file_pattern, reader,
     # else:
     #     labels_to_names = create_readable_names_for_imagenet_labels()
     #     dataset_utils.write_label_file(labels_to_names, dataset_dir)
-
     return slim.dataset.Dataset(
             data_sources=file_pattern,
             reader=reader,
             decoder=decoder,
-            num_samples=split_to_sizes[split_name],
+            num_samples=split_to_sizes,
             items_to_descriptions=items_to_descriptions,
             num_classes=num_classes,
             labels_to_names=labels_to_names)

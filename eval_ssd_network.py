@@ -12,8 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Generic evaluation script that evaluates a SSD model
-on a given dataset."""
+"""Generic evaluation script that evaluates a SSD model on a given dataset.
+Usage:
+python eval_ssd_network.py \
+--eval_dir=/path/to/folder \
+--dataset_dir=/path/to/folder/ \
+--dataset_name=pascalvoc_2007 \
+--dataset_split_name=test \
+--model_name=ssd_300_vgg \
+--checkpoint_path=/path/to/folder \
+--wait_for_checkpoints=True \
+--gpu_memory_fraction=0.1 \
+--num_classes=2 \
+--split_to_sizes=360 \
+--batch_size=1
+
+NOTE that
+--wait_for_checkpoints: if set to True, it will evaluate ckpt continuously, if set to False, only evaluate once.
+NOTE that eval dataset can't contain any zero-object picture, or will caulse error.
+"""
 import math
 import sys
 import six
@@ -65,6 +82,8 @@ tf.app.flags.DEFINE_boolean(
 tf.app.flags.DEFINE_integer(
     'num_classes', 21, 'Number of classes to use in the dataset.')
 tf.app.flags.DEFINE_integer(
+    'split_to_sizes', 5011, 'Number of total images in dataset.')
+tf.app.flags.DEFINE_integer(
     'batch_size', 1, 'The number of samples in each batch.')
 tf.app.flags.DEFINE_integer(
     'max_num_batches', None,
@@ -103,6 +122,15 @@ tf.app.flags.DEFINE_boolean(
 
 FLAGS = tf.app.flags.FLAGS
 
+def flatten(x):
+    result = []
+    for el in x:
+        if isinstance(el, tuple):
+            result.extend(flatten(el))
+        else:
+            result.append(el)
+    return result
+
 
 def main(_):
     if not FLAGS.dataset_dir:
@@ -116,7 +144,7 @@ def main(_):
         # Dataset + SSD model + Pre-processing
         # =================================================================== #
         dataset = dataset_factory.get_dataset(
-            FLAGS.dataset_name, FLAGS.dataset_split_name, FLAGS.dataset_dir)
+            FLAGS.dataset_name, FLAGS.dataset_split_name, FLAGS.dataset_dir,split_to_sizes=FLAGS.split_to_sizes,num_classes=FLAGS.num_classes)
 
         # Get the SSD network and its anchors.
         ssd_class = nets_factory.get_network(FLAGS.model_name)
@@ -315,7 +343,7 @@ def main(_):
                 checkpoint_path=checkpoint_path,
                 logdir=FLAGS.eval_dir,
                 num_evals=num_batches,
-                eval_op=list(names_to_updates.values()),
+                eval_op=flatten(list(names_to_updates.values())),
                 variables_to_restore=variables_to_restore,
                 session_config=config)
             # Log time spent.
@@ -334,7 +362,7 @@ def main(_):
                 checkpoint_dir=checkpoint_path,
                 logdir=FLAGS.eval_dir,
                 num_evals=num_batches,
-                eval_op=list(names_to_updates.values()),
+                eval_op=flatten(list(names_to_updates.values())),
                 variables_to_restore=variables_to_restore,
                 eval_interval_secs=60,
                 max_number_of_evaluations=np.inf,
