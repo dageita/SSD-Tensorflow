@@ -1,15 +1,14 @@
 """
 Usage:
-python /home/wangxf35/models-weights/tensorflow/SSD-Tensorflow/inference_videos_ssd_network.py \
---data_dir=/path/to/videos \
---output_dir=/path/to/folder \
---ckpt_path=/path/to/model.ckpt \
---select_threshold=0.15 \
---nms_threshold=0.1 \
---num_classes=2 \
+python /home/lenovo/wangxf35/dageita/SSD-Tensorflow/inference_realtime_camera_videos_ssd_network.py \
+--rtsp='rtsp://admin:lenovo123@192.168.1.120:554'
+--output_path=/home/wangxf35/data/pre_photo_post_check/internal_detection/test_result/test.avi \
+--ckpt_path=/home/lenovo/wangxf35/test/model.ckpt-8691 \
+--select_threshold=0.22 \
+--nms_threshold=0.15 \
+--num_classes=5 \
 --video_frame_rate=25 \
---video_resolution=3000,4000 \
---videos=True
+--video_resolution=4000,3000
 
 """
 
@@ -20,6 +19,8 @@ import random
 import numpy as np
 import tensorflow as tf
 import cv2
+import queue,threading
+q=queue.Queue()
 
 slim = tf.contrib.slim
 import matplotlib.pyplot as plt
@@ -35,12 +36,13 @@ import time
 
 FLAGS = tf.app.flags.FLAGS
 
+
 tf.app.flags.DEFINE_string(
-    'data_dir', './',
-    'The folder of pictures to be inferenced.')
+    'rtsp', 'rtsp://admin:lenovo123@192.168.1.120:554',
+    'rtsp url')
 tf.app.flags.DEFINE_string(
-    'output_dir', '../',
-    'The folder of inferenced pictures to be storaged.')
+    'output_path', '../',
+    'The path of inferenced realtime video to be storaged, end with xxx.avi')
 tf.app.flags.DEFINE_string(
     'ckpt_path', './model.ckpt',
     'Path to model.ckpt')
@@ -59,13 +61,6 @@ tf.app.flags.DEFINE_integer(
 tf.app.flags.DEFINE_list(
     'video_resolution', [3000,4000],
     'video resolution.')
-tf.app.flags.DEFINE_boolean(
-    'videos', True,
-    'set True if provide folder to inference, set False if provide path to inference.')
-    # videos=FLAGS.videos
-    # video_frame_rate=FLAGS.video_frame_rate
-    # video_resolution=FLAGS.video_resolution
-# TensorFlow session: grow memory when needed. TF, DO NOT USE ALL MY GPU MEMORY!!!
 
 gpu_options = tf.GPUOptions(allow_growth=True)
 config = tf.ConfigProto(log_device_placement=False, gpu_options=gpu_options)
@@ -136,28 +131,43 @@ def process_images(imgs,select_threshold=0.5, nms_threshold=.45, net_shape=(300,
         result_list.append([rclasses, rscores, rbboxes])        
     return result_list
 
-def main(_):
 
-    camera_url = 'rtsp://admin:lenovo123@192.168.1.120:554'
-    out_path = '/home/lenovo/wangxf35'
-    out = cv2.VideoWriter(os.path.join(out_path,"test.avi"), cv2.VideoWriter_fourcc(*'XVID'), 25, (int(4000), int(3000)))
-    print('\n\n\n\n\n\n\n\n\n hello-1')
-    cap = cv2.VideoCapture(camera_url)
+
+def Receive():
+    print("start Reveive")
+    cap = cv2.VideoCapture(FLAGS.rtsp)
+    ret, frame = cap.read()
+    q.put(frame)
+    while ret:
+        ret, frame = cap.read()
+        q.put(frame)
+    cap.release()
+
+def Process():
+    out = cv2.VideoWriter(FLAGS.output_path, cv2.VideoWriter_fourcc(*'XVID'), FLAGS.video_frame_rate, FLAGS.video_resolution[0], FLAGS.video_resolution[1]))
+    print("Start Displaying")
     number = 0
-    while(cap.isOpened()):
-        print('number is',number)
-        ret,frame = cap.read()
-        number += 1
-        if ret:
+    while True:
+        if q.empty() !=True:
+            frame=q.get()
             x = frame[np.newaxis,:]
             number+=1
             result_list=process_images(x,select_threshold=FLAGS.select_threshold,nms_threshold=FLAGS.nms_threshold,parallel_number=1)
             [rclasses, rscores, rbboxes]=result_list[i]
             output_rgb=visualization.bboxes_draw_on_img(frame, rclasses, rscores, rbboxes,visualization.colors_plasma)
             out.write(output_rgb)
-        else:
+            print("number is",number)
+            number += 1
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            out.release()
             break
-    out.release()
-    cap.release()
+
+
+def main(_):
+    p1=threading.Thread(target=Receive)
+    p2 = threading.Thread(target=Process)
+    p1.start()
+    p2.start()
+
 if __name__ == '__main__':
     tf.app.run()
