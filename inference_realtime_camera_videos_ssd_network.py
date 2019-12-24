@@ -1,17 +1,16 @@
 """
 Usage:
-python /home/wangxf35/models-weights/tensorflow/SSD-Tensorflow/inference_pictures_ssd_network.py \
---data_dir=/path/to/folder \
+python /home/wangxf35/models-weights/tensorflow/SSD-Tensorflow/inference_videos_ssd_network.py \
+--data_dir=/path/to/videos \
 --output_dir=/path/to/folder \
 --ckpt_path=/path/to/model.ckpt \
---parallel_number=1 \
---select_threshold=0.16 \
---nms_threshold=0.3 \
---num_classes=2
+--select_threshold=0.15 \
+--nms_threshold=0.1 \
+--num_classes=2 \
+--video_frame_rate=25 \
+--video_resolution=3000,4000 \
+--videos=True
 
-TODO: 
-1.The prediction time can be further improved by optimizing the parallel images processing part code.
-2.Add read .pb function to inference.
 """
 
 import os
@@ -32,14 +31,10 @@ from nets import ssd_vgg_300, ssd_common, np_methods
 from preprocessing import ssd_vgg_preprocessing
 from notebooks import visualization
 import time
-from collections import namedtuple
 
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_integer(
-    'parallel_number', 1,
-    'The number of parallel inference pictures.')
 tf.app.flags.DEFINE_string(
     'data_dir', './',
     'The folder of pictures to be inferenced.')
@@ -58,7 +53,20 @@ tf.app.flags.DEFINE_float(
 tf.app.flags.DEFINE_integer(
     'num_classes', 21,
     'number of classes includes background.')
+tf.app.flags.DEFINE_integer(
+    'video_frame_rate', 25,
+    'video frame rate.')
+tf.app.flags.DEFINE_list(
+    'video_resolution', [3000,4000],
+    'video resolution.')
+tf.app.flags.DEFINE_boolean(
+    'videos', True,
+    'set True if provide folder to inference, set False if provide path to inference.')
+    # videos=FLAGS.videos
+    # video_frame_rate=FLAGS.video_frame_rate
+    # video_resolution=FLAGS.video_resolution
 # TensorFlow session: grow memory when needed. TF, DO NOT USE ALL MY GPU MEMORY!!!
+
 gpu_options = tf.GPUOptions(allow_growth=True)
 config = tf.ConfigProto(log_device_placement=False, gpu_options=gpu_options)
 isess = tf.InteractiveSession(config=config)
@@ -67,7 +75,7 @@ net_shape = (300, 300)
 data_format = 'NHWC'
 images_list=[]
 images_input=tf.placeholder(tf.uint8, shape=(None, None, None, 3))
-for i in range(FLAGS.parallel_number):
+for i in range(1):
     img_input = images_input[i,:]
     # Evaluation pre-processing: resize to SSD net shape.
     image_pre, labels_pre, bboxes_pre, bbox_img = ssd_vgg_preprocessing.preprocess_for_eval(
@@ -93,10 +101,9 @@ def process_images(imgs,select_threshold=0.5, nms_threshold=.45, net_shape=(300,
     # Run SSD network.
     start = time.time()
     rimg,rpredictions, rlocalisations,rbbox_img= isess.run([images_input,predictions, localisations,bbox_img],
-                                                               feed_dict={images_input: imgs})   
-    with open('/home/wangxf35/data/pre_photo_post_check/internal_detection/test_result/rpredictions.txt','w') as f:
-        f.write(str(rpredictions)) 
+                                                            feed_dict={images_input: imgs})                                                        
     end=time.time()
+    
     print('prediction time ',end-start)  
     rpredictions_list=[]
     rlocalisations_list=[]
@@ -107,12 +114,13 @@ def process_images(imgs,select_threshold=0.5, nms_threshold=.45, net_shape=(300,
         rlocalisations_list.append(np.array(rlocalisations[i]))
          
     result_list=[]
-    for i in range(parallel_number):
+    for i in range(1):
         rpredictions=[]
         rlocalisations=[]
         for j in range(len(rpredictions_list)):
             rpredictions.append(rpredictions_list[j][i])
             rlocalisations.append(rlocalisations_list[j][i])
+
     # Get classes and bboxes from the net outputs.
         rclasses, rscores, rbboxes = np_methods.ssd_bboxes_select(
             rpredictions, rlocalisations, ssd_anchors,
@@ -121,7 +129,7 @@ def process_images(imgs,select_threshold=0.5, nms_threshold=.45, net_shape=(300,
         rbboxes = np_methods.bboxes_clip(rbbox_img, rbboxes)
         rclasses, rscores, rbboxes = np_methods.bboxes_sort(rclasses, rscores, rbboxes, top_k=400)
         rclasses, rscores, rbboxes = np_methods.bboxes_nms(rclasses, rscores, rbboxes, nms_threshold=nms_threshold)
-        print('rclasses is',rclasses)
+
         end = time.time()
     # Resize bboxes to original image shape. Note: useless for Resize.WARP!
         rbboxes = np_methods.bboxes_resize(rbbox_img, rbboxes)
@@ -129,25 +137,27 @@ def process_images(imgs,select_threshold=0.5, nms_threshold=.45, net_shape=(300,
     return result_list
 
 def main(_):
-    imgs=os.listdir(FLAGS.data_dir)
-    imgs.sort()
-    i = 0
-    parallel_number=FLAGS.parallel_number
-    start_number= 0
-    while start_number+parallel_number <= len(imgs):
-        img = mpimg.imread(os.path.join(FLAGS.data_dir,imgs[start_number+i]))
-        y = None
-        for i in range(parallel_number):
-            x = img[np.newaxis,:]
-            if i >0:
-                y = np.concatenate((y,x),axis=0)
-            else:
-                y = x
-        result_list = process_images(y,select_threshold=FLAGS.select_threshold,nms_threshold=FLAGS.nms_threshold,parallel_number=parallel_number)
-        for i in range(parallel_number):
-            [rclasses, rscores, rbboxes]=result_list[i]
-            visualization.plt_bboxes(img, rclasses, rscores, rbboxes,save_path=os.path.join(FLAGS.output_dir,imgs[start_number+i][:-4]+'_infer'+imgs[start_number+i][-4:]))
-        start_number+=parallel_number
 
+    camera_url = 'rtsp://admin:lenovo123@192.168.1.120:554'
+    out_path = '/home/lenovo/wangxf35'
+    out = cv2.VideoWriter(os.path.join(out_path,"test.avi"), cv2.VideoWriter_fourcc(*'XVID'), 25, (int(4000), int(3000)))
+    print('\n\n\n\n\n\n\n\n\n hello-1')
+    cap = cv2.VideoCapture(camera_url)
+    number = 0
+    while(cap.isOpened()):
+        print('number is',number)
+        ret,frame = cap.read()
+        number += 1
+        if ret:
+            x = frame[np.newaxis,:]
+            number+=1
+            result_list=process_images(x,select_threshold=FLAGS.select_threshold,nms_threshold=FLAGS.nms_threshold,parallel_number=1)
+            [rclasses, rscores, rbboxes]=result_list[i]
+            output_rgb=visualization.bboxes_draw_on_img(frame, rclasses, rscores, rbboxes,visualization.colors_plasma)
+            out.write(output_rgb)
+        else:
+            break
+    out.release()
+    cap.release()
 if __name__ == '__main__':
     tf.app.run()
