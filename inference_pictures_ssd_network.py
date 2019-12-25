@@ -33,6 +33,7 @@ from preprocessing import ssd_vgg_preprocessing
 from notebooks import visualization
 import time
 from collections import namedtuple
+from nets import nets_factory
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -58,6 +59,8 @@ tf.app.flags.DEFINE_float(
 tf.app.flags.DEFINE_integer(
     'num_classes', 21,
     'number of classes includes background.')
+tf.app.flags.DEFINE_string(
+    'model_name', 'ssd_300_vgg', 'The name of the architecture to train.')
 # TensorFlow session: grow memory when needed. TF, DO NOT USE ALL MY GPU MEMORY!!!
 gpu_options = tf.GPUOptions(allow_growth=True)
 config = tf.ConfigProto(log_device_placement=False, gpu_options=gpu_options)
@@ -77,7 +80,9 @@ images_ssd=tf.concat(images_list,0)
 
 # Define the SSD model.
 reuse = True if 'ssd_net' in locals() else None
-ssd_net = ssd_vgg_300.SSDNet(num_classes = FLAGS.num_classes)
+ssd_class = nets_factory.get_network(FLAGS.model_name)
+ssd_params = ssd_class.default_params._replace(num_classes=FLAGS.num_classes)
+ssd_net = ssd_class(ssd_params)
 with slim.arg_scope(ssd_net.arg_scope(data_format=data_format)):
     predictions, localisations, _, _ = ssd_net.net(images_ssd, is_training=False, reuse=reuse)
 

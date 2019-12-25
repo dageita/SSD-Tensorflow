@@ -85,7 +85,9 @@ images_ssd=tf.concat(images_list,0)
 
 # Define the SSD model.
 reuse = True if 'ssd_net' in locals() else None
-ssd_net = ssd_vgg_300.SSDNet(num_classes = FLAGS.num_classes)
+ssd_class = nets_factory.get_network(FLAGS.model_name)
+ssd_params = ssd_class.default_params._replace(num_classes=FLAGS.num_classes)
+ssd_net = ssd_class(ssd_params)
 with slim.arg_scope(ssd_net.arg_scope(data_format=data_format)):
     predictions, localisations, _, _ = ssd_net.net(images_ssd, is_training=False, reuse=reuse)
 

@@ -67,7 +67,7 @@ RANDOM_SEED = 4242
 
 
 
-def _process_image(directory, name):
+def _process_image(directory, name,class_names):
     """Process a image and annotation file.
 
     Args:
@@ -100,7 +100,10 @@ def _process_image(directory, name):
     truncated = []
     for obj in root.findall('object'):
         label = obj.find('name').text
-        labels.append(1)
+        if class_names:
+            labels.append(class_names[label])
+        else:
+            labels.append(1)
         # labels.append(int(VOC_LABELS[label][0]))
         labels_text.append(label.encode('ascii'))
 
@@ -166,7 +169,7 @@ def _convert_to_example(image_data, labels, labels_text, bboxes, shape,
     return example
 
 
-def _add_to_tfrecord(dataset_dir, name, tfrecord_writer):
+def _add_to_tfrecord(dataset_dir, name, tfrecord_writer,class_names):
     """Loads data from image and annotations files and add them to a TFRecord.
 
     Args:
@@ -175,7 +178,7 @@ def _add_to_tfrecord(dataset_dir, name, tfrecord_writer):
       tfrecord_writer: The TFRecord writer to use for writing.
     """
     image_data, shape, bboxes, labels, labels_text, difficult, truncated = \
-        _process_image(dataset_dir, name)
+        _process_image(dataset_dir, name,class_names)
     example = _convert_to_example(image_data, labels, labels_text,
                                   bboxes, shape, difficult, truncated)
     tfrecord_writer.write(example.SerializeToString())
@@ -204,6 +207,16 @@ def run(dataset_dir, output_dir, name='voc_2007_train', samples_per_files=200, s
         random.seed(RANDOM_SEED)
         random.shuffle(filenames)
 
+    
+    if class_names:
+        # write the labels file:
+        labels_to_class_names = dict(zip(range(len(class_names)), class_names))
+        write_label_file(labels_to_class_names, output_dir)
+        # Define the classes name for labels
+        class_names_dict = {}
+        for i in range(len(class_names)):
+            class_names_dict[class_names[i]] = i
+
     # Process dataset files.
     i = 0
     fidx = 0
@@ -218,12 +231,9 @@ def run(dataset_dir, output_dir, name='voc_2007_train', samples_per_files=200, s
 
                 filename = filenames[i]
                 img_name = filename[:-4]
-                _add_to_tfrecord(dataset_dir, img_name, tfrecord_writer)
+                _add_to_tfrecord(dataset_dir, img_name, tfrecord_writer,class_names_dict)
                 i += 1
                 j += 1
             fidx += 1
-    if class_names:
-    # Finally, write the labels file:
-        labels_to_class_names = dict(zip(range(len(class_names)), class_names))
-        write_label_file(labels_to_class_names, output_dir)
+
     print('\nFinished converting the Pascal VOC dataset!')
