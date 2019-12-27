@@ -99,8 +99,6 @@ def process_images(imgs,select_threshold=0.5, nms_threshold=.45, net_shape=(300,
     start = time.time()
     rimg,rpredictions, rlocalisations,rbbox_img= isess.run([images_input,predictions, localisations,bbox_img],
                                                                feed_dict={images_input: imgs})   
-    with open('/home/wangxf35/data/pre_photo_post_check/internal_detection/test_result/rpredictions.txt','w') as f:
-        f.write(str(rpredictions)) 
     end=time.time()
     print('prediction time ',end-start)  
     rpredictions_list=[]
