@@ -61,77 +61,41 @@ tf.app.flags.DEFINE_integer(
     'number of classes includes background.')
 tf.app.flags.DEFINE_string(
     'model_name', 'ssd_300_vgg', 'The name of the architecture to train.')
-# TensorFlow session: grow memory when needed. TF, DO NOT USE ALL MY GPU MEMORY!!!
-gpu_options = tf.GPUOptions(allow_growth=True)
-config = tf.ConfigProto(log_device_placement=False, gpu_options=gpu_options)
-isess = tf.InteractiveSession(config=config)
-# Input placeholder.
-net_shape = (300, 300)
-data_format = 'NHWC'
-images_list=[]
-images_input=tf.placeholder(tf.uint8, shape=(None, None, None, 3))
-for i in range(FLAGS.parallel_number):
-    img_input = images_input[i,:]
-    # Evaluation pre-processing: resize to SSD net shape.
-    image_pre, labels_pre, bboxes_pre, bbox_img = ssd_vgg_preprocessing.preprocess_for_eval(
-        img_input, None, None, net_shape, data_format, resize=ssd_vgg_preprocessing.Resize.WARP_RESIZE)
-    images_list.append(tf.expand_dims(image_pre, 0))
-images_ssd=tf.concat(images_list,0)
-
-# Define the SSD model.
-reuse = True if 'ssd_net' in locals() else None
-ssd_class = nets_factory.get_network(FLAGS.model_name)
-ssd_params = ssd_class.default_params._replace(num_classes=FLAGS.num_classes)
-ssd_net = ssd_class(ssd_params)
-with slim.arg_scope(ssd_net.arg_scope(data_format=data_format)):
-    predictions, localisations, _, _ = ssd_net.net(images_ssd, is_training=False, reuse=reuse)
-
-# Restore SSD model.
-isess.run(tf.global_variables_initializer())
-saver = tf.train.Saver()
-saver.restore(isess, FLAGS.ckpt_path)
-# SSD default anchor boxes.
-ssd_anchors = ssd_net.anchors(net_shape)
-
-# Main image processing routine
-def process_images(imgs,select_threshold=0.5, nms_threshold=.45, net_shape=(300, 300),parallel_number=4):
-    # Run SSD network.
-    start = time.time()
-    rimg,rpredictions, rlocalisations,rbbox_img= isess.run([images_input,predictions, localisations,bbox_img],
-                                                               feed_dict={images_input: imgs})   
-    end=time.time()
-    print('prediction time ',end-start)  
-    rpredictions_list=[]
-    rlocalisations_list=[]
-    for i in range(len(rpredictions)):
-        rpredictions[i]=np.split(rpredictions[i], parallel_number, axis=0)
-        rlocalisations[i]=np.split(rlocalisations[i], parallel_number, axis=0)
-        rpredictions_list.append(np.array(rpredictions[i]))
-        rlocalisations_list.append(np.array(rlocalisations[i]))
-         
-    result_list=[]
-    for i in range(parallel_number):
-        rpredictions=[]
-        rlocalisations=[]
-        for j in range(len(rpredictions_list)):
-            rpredictions.append(rpredictions_list[j][i])
-            rlocalisations.append(rlocalisations_list[j][i])
-    # Get classes and bboxes from the net outputs.
-        rclasses, rscores, rbboxes = np_methods.ssd_bboxes_select(
-            rpredictions, rlocalisations, ssd_anchors,
-            select_threshold=select_threshold, img_shape=net_shape, num_classes=FLAGS.num_classes, decode=True)
-        
-        rbboxes = np_methods.bboxes_clip(rbbox_img, rbboxes)
-        rclasses, rscores, rbboxes = np_methods.bboxes_sort(rclasses, rscores, rbboxes, top_k=400)
-        rclasses, rscores, rbboxes = np_methods.bboxes_nms(rclasses, rscores, rbboxes, nms_threshold=nms_threshold)
-        print('rclasses is',rclasses)
-        end = time.time()
-    # Resize bboxes to original image shape. Note: useless for Resize.WARP!
-        rbboxes = np_methods.bboxes_resize(rbbox_img, rbboxes)
-        result_list.append([rclasses, rscores, rbboxes])        
-    return result_list
 
 def main(_):
+    # TensorFlow session: grow memory when needed. TF, DO NOT USE ALL MY GPU MEMORY!!!
+    gpu_options = tf.GPUOptions(allow_growth=True)
+    config = tf.ConfigProto(log_device_placement=False, gpu_options=gpu_options)
+    isess = tf.InteractiveSession(config=config)
+    # Input placeholder.
+    net_shape = (300, 300)
+    data_format = 'NHWC'
+    images_list=[]
+    images_input=tf.placeholder(tf.uint8, shape=(None, None, None, 3))
+    for i in range(FLAGS.parallel_number):
+        img_input = images_input[i,:]
+        # Evaluation pre-processing: resize to SSD net shape.
+        image_pre, labels_pre, bboxes_pre, bbox_img = ssd_vgg_preprocessing.preprocess_for_eval(
+            img_input, None, None, net_shape, data_format, resize=ssd_vgg_preprocessing.Resize.WARP_RESIZE)
+        images_list.append(tf.expand_dims(image_pre, 0))
+    images_ssd=tf.concat(images_list,0)
+
+    # Define the SSD model.
+    reuse = True if 'ssd_net' in locals() else None
+    ssd_class = nets_factory.get_network(FLAGS.model_name)
+    ssd_params = ssd_class.default_params._replace(num_classes=FLAGS.num_classes)
+    ssd_net = ssd_class(ssd_params)
+    with slim.arg_scope(ssd_net.arg_scope(data_format=data_format)):
+        predictions, localisations, _, _ = ssd_net.net(images_ssd, is_training=False, reuse=reuse)
+
+    # Restore SSD model.
+    isess.run(tf.global_variables_initializer())
+    saver = tf.train.Saver()
+    saver.restore(isess, FLAGS.ckpt_path)
+    # SSD default anchor boxes.
+    ssd_anchors = ssd_net.anchors(net_shape)
+
+    # process
     imgs=os.listdir(FLAGS.data_dir)
     imgs.sort()
     i = 0
@@ -146,7 +110,42 @@ def main(_):
                 y = np.concatenate((y,x),axis=0)
             else:
                 y = x
-        result_list = process_images(y,select_threshold=FLAGS.select_threshold,nms_threshold=FLAGS.nms_threshold,parallel_number=parallel_number)
+        # Run SSD network.
+        start = time.time()
+        rimg,rpredictions, rlocalisations,rbbox_img= isess.run([images_input,predictions, localisations,bbox_img],
+                                                                   feed_dict={images_input: y})   
+        end=time.time()
+        print('prediction time ',end-start)  
+        rpredictions_list=[]
+        rlocalisations_list=[]
+        for i in range(len(rpredictions)):
+            rpredictions[i]=np.split(rpredictions[i], parallel_number, axis=0)
+            rlocalisations[i]=np.split(rlocalisations[i], parallel_number, axis=0)
+            rpredictions_list.append(np.array(rpredictions[i]))
+            rlocalisations_list.append(np.array(rlocalisations[i]))
+            
+        result_list=[]
+        for i in range(parallel_number):
+            rpredictions=[]
+            rlocalisations=[]
+            for j in range(len(rpredictions_list)):
+                rpredictions.append(rpredictions_list[j][i])
+                rlocalisations.append(rlocalisations_list[j][i])
+        # Get classes and bboxes from the net outputs.
+            rclasses, rscores, rbboxes = np_methods.ssd_bboxes_select(
+                rpredictions, rlocalisations, ssd_anchors,
+                select_threshold=FLAGS.select_threshold, img_shape=net_shape, num_classes=FLAGS.num_classes, decode=True)
+            
+            rbboxes = np_methods.bboxes_clip(rbbox_img, rbboxes)
+            rclasses, rscores, rbboxes = np_methods.bboxes_sort(rclasses, rscores, rbboxes, top_k=400)
+            rclasses, rscores, rbboxes = np_methods.bboxes_nms(rclasses, rscores, rbboxes, nms_threshold=FLAGS.nms_threshold)
+            print('rclasses is',rclasses)
+            end = time.time()
+        # Resize bboxes to original image shape. Note: useless for Resize.WARP!
+            rbboxes = np_methods.bboxes_resize(rbbox_img, rbboxes)
+            result_list.append([rclasses, rscores, rbboxes])   
+        
+        # visulization the images
         for i in range(parallel_number):
             [rclasses, rscores, rbboxes]=result_list[i]
             visualization.plt_bboxes(img, rclasses, rscores, rbboxes,save_path=os.path.join(FLAGS.output_dir,imgs[start_number+i][:-4]+'_infer'+imgs[start_number+i][-4:]))
