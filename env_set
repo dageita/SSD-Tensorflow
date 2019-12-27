@@ -1,0 +1,1 @@
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/HCNetSDK/lib:/opt/HCNetSDK/lib/HCNetSDKCom:/home/lenovo/tensorflow-r1.13/bazel-bin/tensorflow:/home/lenovo/develop/AOI_SZP/build/out

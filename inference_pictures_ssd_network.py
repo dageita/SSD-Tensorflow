@@ -45,7 +45,7 @@ tf.app.flags.DEFINE_string(
     'data_dir', './',
     'The folder of pictures to be inferenced.')
 tf.app.flags.DEFINE_string(
-    'output_dir', '../',
+    'output_dir', None,
     'The folder of inferenced pictures to be storaged.')
 tf.app.flags.DEFINE_string(
     'ckpt_path', './model.ckpt',
@@ -63,6 +63,7 @@ tf.app.flags.DEFINE_string(
     'model_name', 'ssd_300_vgg', 'The name of the architecture to train.')
 
 def main(_):
+    ret = 0  # result=0 represent inference wrong!
     # TensorFlow session: grow memory when needed. TF, DO NOT USE ALL MY GPU MEMORY!!!
     gpu_options = tf.GPUOptions(allow_growth=True)
     config = tf.ConfigProto(log_device_placement=False, gpu_options=gpu_options)
@@ -95,14 +96,19 @@ def main(_):
     # SSD default anchor boxes.
     ssd_anchors = ssd_net.anchors(net_shape)
 
-    # process
-    imgs=os.listdir(FLAGS.data_dir)
-    imgs.sort()
+    data_dir = FLAGS.data_dir
+    # process images
+    if os.path.isdir(data_dir):
+        imgs=os.listdir(data_dir)
+        imgs.sort()
+    else:
+        imgs=[data_dir[data_dir.rfind('/')+1:]]
+        data_dir=data_dir[:data_dir.rfind('/')]
     i = 0
     parallel_number=FLAGS.parallel_number
     start_number= 0
     while start_number+parallel_number <= len(imgs):
-        img = mpimg.imread(os.path.join(FLAGS.data_dir,imgs[start_number+i]))
+        img = mpimg.imread(os.path.join(data_dir,imgs[start_number+i]))
         y = None
         for i in range(parallel_number):
             x = img[np.newaxis,:]
@@ -146,10 +152,16 @@ def main(_):
             result_list.append([rclasses, rscores, rbboxes])   
         
         # visulization the images
+        output_dir = FLAGS.output_dir
+        if not output_dir:
+            output_dir=data_dir
         for i in range(parallel_number):
             [rclasses, rscores, rbboxes]=result_list[i]
-            visualization.plt_bboxes(img, rclasses, rscores, rbboxes,save_path=os.path.join(FLAGS.output_dir,imgs[start_number+i][:-4]+'_infer'+imgs[start_number+i][-4:]))
+            visualization.plt_bboxes(img, rclasses, rscores, rbboxes,save_path=os.path.join(output_dir,imgs[start_number+i][:-4]+'_infer'+imgs[start_number+i][-4:]))
         start_number+=parallel_number
+
+        ret = 1
+        return ret
 
 if __name__ == '__main__':
     tf.app.run()
