@@ -62,13 +62,14 @@ tf.app.flags.DEFINE_integer(
 tf.app.flags.DEFINE_string(
     'model_name', 'ssd_300_vgg', 'The name of the architecture to train.')
 
-def main(_):
-    ret = 0  # result=0 represent inference wrong!
-    # TensorFlow session: grow memory when needed. TF, DO NOT USE ALL MY GPU MEMORY!!!
-    gpu_options = tf.GPUOptions(allow_growth=True)
-    config = tf.ConfigProto(log_device_placement=False, gpu_options=gpu_options)
-    isess = tf.InteractiveSession(config=config)
+def main(_,isess):
+    ret = -1  # result=-1 represent inference wrong!
+    # # TensorFlow session: grow memory when needed. TF, DO NOT USE ALL MY GPU MEMORY!!!
+    # gpu_options = tf.GPUOptions(allow_growth=True)
+    # config = tf.ConfigProto(log_device_placement=False, gpu_options=gpu_options)
+    # isess = tf.InteractiveSession(config=config)
     # Input placeholder.
+    tf.reset_default_graph() 
     net_shape = (300, 300)
     data_format = 'NHWC'
     images_list=[]
@@ -159,7 +160,6 @@ def main(_):
             [rclasses, rscores, rbboxes]=result_list[i]
             visualization.plt_bboxes(img, rclasses, rscores, rbboxes,save_path=os.path.join(output_dir,imgs[start_number+i][:-4]+'_infer'+imgs[start_number+i][-4:]))
         start_number+=parallel_number
-
         ret = 1
         return ret
 
