@@ -49,7 +49,7 @@ class SSDNetInference(object):
         self.isess = tf.InteractiveSession(config=self.config)
         # Input placeholder.
         self.net_shape = (300, 300)
-        self.data_format = 'NHWC'
+        self.data_format = 'NCHW'
         self.images_list=[]
         self.images_input=tf.placeholder(tf.uint8, shape=(None, None, None, 3))
         for i in range(self.parallel_number):

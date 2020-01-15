@@ -90,6 +90,7 @@ def bboxes_draw_on_img(img, classes, scores, bboxes, colors, save_path='./',thic
             # Draw text...
             s = '%s/%.3f' % (classes[i], scores[i])
             p1 = (p1[0]-5, p1[1])
+            img = cv2.cvtColor(img,cv2.COLOR_BGR2RGB)
             cv2.putText(img, s, p1[::-1], cv2.FONT_HERSHEY_DUPLEX, 3, color, 1)
             toObjectDetection.append(write_dict)
             cv2.imwrite(save_path,img)
